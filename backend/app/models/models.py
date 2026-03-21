@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Numeric, Enum,
-    ForeignKey, DateTime, CheckConstraint, UniqueConstraint, Text,
+    ForeignKey, DateTime, CheckConstraint, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 try:
@@ -15,8 +15,9 @@ except ImportError:
 from app.database import Base
 
 
-# ── Enums ──
+# Enums 
 
+# User Roles
 class UserRole(str, enum.Enum):
     citizen = "citizen"
     technician = "technician"
@@ -24,13 +25,13 @@ class UserRole(str, enum.Enum):
     buyer = "buyer"
     admin = "admin"
 
-
+# Validation and Verification Enums
 class VerificationStatus(str, enum.Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
 
-
+# Waste and Listing Enums
 class MaterialType(str, enum.Enum):
     electronics = "electronics"
     plastic = "plastic"
@@ -40,13 +41,13 @@ class MaterialType(str, enum.Enum):
     mixed = "mixed"
     other = "other"
 
-
+# Waste Condition Enums
 class WasteCondition(str, enum.Enum):
     functional = "functional"
     repairable = "repairable"
     scrap = "scrap"
 
-
+# listing and Transaction Status Enums
 class ListingStatus(str, enum.Enum):
     pending_review = "pending_review"
     available = "available"
@@ -55,7 +56,7 @@ class ListingStatus(str, enum.Enum):
     completed = "completed"
     rejected = "rejected"
 
-
+# transaction Status Enums
 class TransactionStatus(str, enum.Enum):
     offer_received = "offer_received"
     offer_accepted = "offer_accepted"
@@ -63,7 +64,7 @@ class TransactionStatus(str, enum.Enum):
     completed = "completed"
     cancelled = "cancelled"
 
-
+# Service Request Status Enums
 class ServiceRequestStatus(str, enum.Enum):
     pending = "pending"
     confirmed = "confirmed"
@@ -71,7 +72,7 @@ class ServiceRequestStatus(str, enum.Enum):
     completed = "completed"
     cancelled = "cancelled"
 
-
+# Review Interaction Types
 class InteractionType(str, enum.Enum):
     repair = "repair"
     waste_transaction = "waste_transaction"
@@ -80,6 +81,7 @@ class InteractionType(str, enum.Enum):
 # ── Models ──
 
 class User(Base):
+    """Represents a user in the RECYX system, encompassing citizens, technicians, recyclers, buyers, and admins."""
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, index=True)
@@ -116,6 +118,7 @@ class User(Base):
 
 
 class TechnicianProfile(Base):
+    """Represents a technician's profile, linked to a user with the technician role."""
     __tablename__ = "technician_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -137,6 +140,7 @@ class TechnicianProfile(Base):
 
 
 class RecyclerProfile(Base):
+    """Represents a recycler's profile, linked to a user with the recycler role."""
     __tablename__ = "recycler_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -155,6 +159,7 @@ class RecyclerProfile(Base):
 
 
 class WasteListing(Base):
+    """Represents a waste listing posted by a user, detailing the material, quantity, condition, and status of the listing. """
     __tablename__ = "waste_listings"
 
     listing_id = Column(Integer, primary_key=True, index=True)
@@ -177,6 +182,7 @@ class WasteListing(Base):
 
 
 class Transaction(Base):
+    """Represents a transaction between a buyer and seller for a waste listing, tracking the agreed price, status, and timestamps of the transaction."""
     __tablename__ = "transactions"
 
     transaction_id = Column(Integer, primary_key=True, index=True)
@@ -196,6 +202,7 @@ class Transaction(Base):
 
 
 class ServiceRequest(Base):
+    """Represents a service request made by a citizen to a technician, detailing the device type, issue description, status, and scheduled date for the service."""
     __tablename__ = "service_requests"
 
     request_id = Column(Integer, primary_key=True, index=True)
@@ -215,6 +222,7 @@ class ServiceRequest(Base):
 
 
 class Review(Base):
+    """Represents a review written by a user (reviewer) about another user (reviewed_user) based on an interaction, such as a repair service or waste transaction. The review includes a rating, comment, and is linked to the specific interaction it pertains to."""
     __tablename__ = "reviews"
 
     review_id = Column(Integer, primary_key=True, index=True)
@@ -239,6 +247,7 @@ class Review(Base):
 
 
 class Notification(Base):
+    """Represents a notification sent to a user, containing a message about an event or update related to their account, listings, transactions, or service requests. The notification tracks whether it has been read and when it was created."""
     __tablename__ = "notifications"
 
     notification_id = Column(Integer, primary_key=True, index=True)
