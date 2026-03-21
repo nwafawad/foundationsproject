@@ -1,0 +1,76 @@
+# Render.com deployment configuration for RECYX
+# Deploy both FastAPI backend and React frontend on Render
+#
+# SETUP INSTRUCTIONS:
+# 1. Push this file to GitHub
+# 2. Go to https://render.com and create a new account or log in
+# 3. Click "New" > "Blueprint" and connect your GitHub repo
+# 4. Render will detect this file and create both services automatically
+# 5. After first deploy, copy the backend service URL (e.g. https://recyx-api.onrender.com)
+#    and set it as REACT_APP_API_URL in the frontend environment variables
+# 6. Also set FRONTEND_URL in the backend to the frontend URL (e.g. https://recyx.onrender.com)
+
+services:
+  # ── Backend: FastAPI ──────────────────────────────────────────────────
+  - type: web
+    name: recyx-api
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        # For production, use a PostgreSQL database URL
+        # You can add a Render PostgreSQL database and link it here
+        # Format: postgresql+psycopg://user:password@host/dbname
+        value: sqlite:///./recyx_prod.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_HOURS
+        value: 12
+      - key: APP_ENV
+        value: production
+      - key: FRONTEND_URL
+        # Update this after deploying the frontend - set to the actual Render frontend URL
+        value: https://recyx.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  # ── Frontend: React (Static Site) ────────────────────────────────────
+  - type: web
+    name: recyx
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && CI=false npm run build
+    staticPublishPath: build
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        # Update to actual backend URL after first deploy
+        value: https://recyx-api.onrender.com
+      - key: REACT_APP_EMAILJS_SERVICE_ID
+        sync: false
+      - key: REACT_APP_EMAILJS_PUBLIC_KEY
+        sync: false
+      - key: REACT_APP_EMAILJS_VERIFICATION_TEMPLATE
+        sync: false
+      - key: REACT_APP_EMAILJS_ADMIN_NOTIFY_TEMPLATE
+        sync: false
+      - key: REACT_APP_EMAILJS_APPROVAL_TEMPLATE
+        sync: false
+      - key: REACT_APP_EMAILJS_TRANSACTION_TEMPLATE
+        sync: false
+      - key: REACT_APP_ADMIN_EMAIL
+        sync: false
