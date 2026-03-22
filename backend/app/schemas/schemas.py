@@ -3,6 +3,16 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
+from app.models.models import (
+    InteractionType,
+    ListingStatus,
+    MaterialType,
+    ServiceRequestStatus,
+    TransactionStatus,
+    UserRole,
+    VerificationStatus,
+    WasteCondition,
+)
 
 
 # ── Auth ──
@@ -15,7 +25,7 @@ class UserRegister(BaseModel):
     password: str = Field(..., min_length=8)
     phone: Optional[str] = None
     district: Optional[str] = None
-    role: str = "citizen"
+    role: UserRole = UserRole.citizen
 
 
 class UserLogin(BaseModel):
@@ -40,11 +50,11 @@ class UserOut(BaseModel):
     user_id: int
     full_name: str
     email: str
-    role: str
+    role: UserRole
     phone: Optional[str] = None
     district: Optional[str] = None
     is_verified: bool
-    verification_status: str
+    verification_status: VerificationStatus
     created_at: datetime
 
     class Config:
@@ -65,7 +75,7 @@ class TechnicianProfileOut(BaseModel):
     email: str
     specialisation: Optional[str] = None
     years_experience: int = 0
-    verification_status: str
+    verification_status: VerificationStatus
     average_rating: float = 0
     total_jobs: int = 0
     district: Optional[str] = None
@@ -103,7 +113,7 @@ class ServiceRequestOut(BaseModel):
     technician_id: int
     device_type: str
     issue_description: str
-    status: str
+    status: ServiceRequestStatus
     scheduled_date: Optional[datetime] = None
     created_at: datetime
 
@@ -116,9 +126,9 @@ class ServiceRequestOut(BaseModel):
 class ListingCreate(BaseModel):
     """Payload used to create a new waste listing."""
 
-    material_type: str
+    material_type: MaterialType
     quantity_kg: float = Field(..., gt=0)
-    condition: str
+    condition: WasteCondition
     description: Optional[str] = None
     district: str
 
@@ -129,12 +139,12 @@ class ListingOut(BaseModel):
     listing_id: int
     posted_by: int
     poster_name: Optional[str] = None
-    material_type: str
+    material_type: MaterialType
     quantity_kg: float
-    condition: str
+    condition: WasteCondition
     description: Optional[str] = None
     district: str
-    status: str
+    status: ListingStatus
     created_at: datetime
 
     class Config:
@@ -144,10 +154,10 @@ class ListingOut(BaseModel):
 class ListingSearchParams(BaseModel):
     """Schema for filtering waste listings based on search criteria."""
 
-    material_type: Optional[str] = None
-    condition: Optional[str] = None
+    material_type: Optional[MaterialType] = None
+    condition: Optional[WasteCondition] = None
     district: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[ListingStatus] = None
     page: int = 1
     limit: int = 20
 
@@ -164,7 +174,7 @@ class TransactionCreate(BaseModel):
 class TransactionStatusUpdate(BaseModel):
     """Payload used to update the status of an existing transaction."""
 
-    status: str
+    status: TransactionStatus
 
 
 class TransactionOut(BaseModel):
@@ -174,7 +184,7 @@ class TransactionOut(BaseModel):
     seller_id: int
     buyer_id: int
     agreed_price: Optional[float] = None
-    status: str
+    status: TransactionStatus
     created_at: datetime
     completed_at: Optional[datetime] = None
 
@@ -188,7 +198,7 @@ class ReviewCreate(BaseModel):
     """Payload used to create a new review."""
 
     reviewed_user_id: int
-    interaction_type: str
+    interaction_type: InteractionType
     interaction_id: int
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
@@ -200,7 +210,7 @@ class ReviewOut(BaseModel):
     review_id: int
     reviewer_id: int
     reviewed_user_id: int
-    interaction_type: str
+    interaction_type: InteractionType
     rating: int
     comment: Optional[str] = None
     created_at: datetime
