@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Numeric, Enum,
-    ForeignKey, DateTime, CheckConstraint, UniqueConstraint,
+    ForeignKey, DateTime, CheckConstraint, UniqueConstraint, Text,
 )
 from sqlalchemy.orm import relationship
 try:
@@ -15,9 +15,8 @@ except ImportError:
 from app.database import Base
 
 
-# Enums 
+# ── Enums ──
 
-# User Roles
 class UserRole(str, enum.Enum):
     citizen = "citizen"
     technician = "technician"
@@ -25,13 +24,13 @@ class UserRole(str, enum.Enum):
     buyer = "buyer"
     admin = "admin"
 
-# Validation and Verification Enums
+
 class VerificationStatus(str, enum.Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
 
-# Waste and Listing Enums
+
 class MaterialType(str, enum.Enum):
     electronics = "electronics"
     plastic = "plastic"
@@ -41,13 +40,13 @@ class MaterialType(str, enum.Enum):
     mixed = "mixed"
     other = "other"
 
-# Waste Condition Enums
+
 class WasteCondition(str, enum.Enum):
     functional = "functional"
     repairable = "repairable"
     scrap = "scrap"
 
-# listing and Transaction Status Enums
+
 class ListingStatus(str, enum.Enum):
     pending_review = "pending_review"
     available = "available"
@@ -56,7 +55,7 @@ class ListingStatus(str, enum.Enum):
     completed = "completed"
     rejected = "rejected"
 
-# transaction Status Enums
+
 class TransactionStatus(str, enum.Enum):
     offer_received = "offer_received"
     offer_accepted = "offer_accepted"
@@ -64,7 +63,7 @@ class TransactionStatus(str, enum.Enum):
     completed = "completed"
     cancelled = "cancelled"
 
-# Service Request Status Enums
+
 class ServiceRequestStatus(str, enum.Enum):
     pending = "pending"
     confirmed = "confirmed"
@@ -72,7 +71,7 @@ class ServiceRequestStatus(str, enum.Enum):
     completed = "completed"
     cancelled = "cancelled"
 
-# Review Interaction Types
+
 class InteractionType(str, enum.Enum):
     repair = "repair"
     waste_transaction = "waste_transaction"
@@ -81,7 +80,7 @@ class InteractionType(str, enum.Enum):
 # ── Models ──
 
 class User(Base):
-    """Represents a user in the RECYX system, encompassing citizens, technicians, recyclers, buyers, and admins."""
+    """All users of the platform, including citizens, technicians, recyclers, buyers, and admins."""
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, index=True)
@@ -107,7 +106,8 @@ class User(Base):
     recycler_profile = relationship(
         "RecyclerProfile", back_populates="user", uselist=False
     )
-    listings = relationship("WasteListing", back_populates="poster")
+    listings = relationship(
+        "WasteListing", back_populates="poster", foreign_keys="WasteListing.posted_by")
     reviews_written = relationship(
         "Review", foreign_keys="Review.reviewer_id", back_populates="reviewer"
     )
@@ -118,7 +118,7 @@ class User(Base):
 
 
 class TechnicianProfile(Base):
-    """Represents a technician's profile, linked to a user with the technician role."""
+    """Additional details for users with the technician role, including their specialisation, experience, and verification status."""
     __tablename__ = "technician_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -140,7 +140,7 @@ class TechnicianProfile(Base):
 
 
 class RecyclerProfile(Base):
-    """Represents a recycler's profile, linked to a user with the recycler role."""
+    """Additional details for users with the recycler role, including their company information and operating details."""
     __tablename__ = "recycler_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -159,7 +159,7 @@ class RecyclerProfile(Base):
 
 
 class WasteListing(Base):
-    """Represents a waste listing posted by a user, detailing the material, quantity, condition, and status of the listing. """
+    """Listings for waste materials that citizens want to sell or give away, including details about the material, condition, location, and transaction status."""
     __tablename__ = "waste_listings"
 
     listing_id = Column(Integer, primary_key=True, index=True)
@@ -167,9 +167,18 @@ class WasteListing(Base):
     material_type = Column(Enum(MaterialType), nullable=False)
     quantity_kg = Column(Numeric(8, 2), nullable=False)
     condition = Column(Enum(WasteCondition), nullable=False)
+    title = Column(String(200))  # Display title for marketplace
     description = Column(Text)
     district = Column(String(80))
+    sector = Column(String(80))  # Specific area within district
     status = Column(Enum(ListingStatus), default=ListingStatus.pending_review)
+    price = Column(Numeric(12, 2), default=0)  # Price in RWF
+    views = Column(Integer, default=0)  # View count
+    favorites = Column(Integer, default=0)  # Favorite count
+    image = Column(String(500))  # Main image URL
+    images = Column(Text)  # JSON array of additional images
+    payment_method = Column(String(20), default='mtn')  # mtn, airteltig, cash
+    payment_number = Column(String(20))  # Payment phone number
     verified_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     verified_at = Column(DateTime, nullable=True)
     visit_required = Column(Boolean, default=False)
@@ -177,12 +186,13 @@ class WasteListing(Base):
     admin_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    poster = relationship("User", back_populates="listings", foreign_keys=[posted_by])
+    poster = relationship("User", back_populates="listings",
+                          foreign_keys=[posted_by])
     transactions = relationship("Transaction", back_populates="listing")
 
 
 class Transaction(Base):
-    """Represents a transaction between a buyer and seller for a waste listing, tracking the agreed price, status, and timestamps of the transaction."""
+    """Represents a transaction between a buyer and seller for a waste listing, including the agreed price, status, and timestamps for the transaction process."""
     __tablename__ = "transactions"
 
     transaction_id = Column(Integer, primary_key=True, index=True)
@@ -202,12 +212,13 @@ class Transaction(Base):
 
 
 class ServiceRequest(Base):
-    """Represents a service request made by a citizen to a technician, detailing the device type, issue description, status, and scheduled date for the service."""
+    """Represents a service request from a citizen to a technician for device repair, including details about the device, issue, and status of the request."""
     __tablename__ = "service_requests"
 
     request_id = Column(Integer, primary_key=True, index=True)
     citizen_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    technician_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    technician_id = Column(Integer, ForeignKey(
+        "users.user_id"), nullable=False)
     device_type = Column(String(100))
     issue_description = Column(Text)
     status = Column(
@@ -217,17 +228,19 @@ class ServiceRequest(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        CheckConstraint("citizen_id != technician_id", name="check_self_request"),
+        CheckConstraint("citizen_id != technician_id",
+                        name="check_self_request"),
     )
 
 
 class Review(Base):
-    """Represents a review written by a user (reviewer) about another user (reviewed_user) based on an interaction, such as a repair service or waste transaction. The review includes a rating, comment, and is linked to the specific interaction it pertains to."""
+    """Represents a review left by a user for another user after an interaction, such as a repair service or waste transaction, including the rating, comment, and type of interaction."""
     __tablename__ = "reviews"
 
     review_id = Column(Integer, primary_key=True, index=True)
     reviewer_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    reviewed_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    reviewed_user_id = Column(Integer, ForeignKey(
+        "users.user_id"), nullable=False)
     interaction_type = Column(Enum(InteractionType), nullable=False)
     interaction_id = Column(Integer, nullable=False)
     rating = Column(Integer, nullable=False)
@@ -239,15 +252,29 @@ class Review(Base):
             "reviewer_id", "interaction_type", "interaction_id",
             name="unique_review_per_interaction",
         ),
-        CheckConstraint("rating >= 1 AND rating <= 5", name="check_rating_range"),
+        CheckConstraint("rating >= 1 AND rating <= 5",
+                        name="check_rating_range"),
     )
 
-    reviewer = relationship("User", foreign_keys=[reviewer_id], back_populates="reviews_written")
-    reviewed_user = relationship("User", foreign_keys=[reviewed_user_id], back_populates="reviews_received")
+    reviewer = relationship("User", foreign_keys=[
+                            reviewer_id], back_populates="reviews_written")
+    reviewed_user = relationship(
+        "User", foreign_keys=[reviewed_user_id], back_populates="reviews_received")
+
+
+class Favorite(Base):
+    """Represents a favorite listing added by a user."""
+    __tablename__ = "favorites"
+    __table_args__ = (UniqueConstraint('user_id', 'listing_id', name='unique_user_listing_favorite'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("waste_listings.listing_id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Notification(Base):
-    """Represents a notification sent to a user, containing a message about an event or update related to their account, listings, transactions, or service requests. The notification tracks whether it has been read and when it was created."""
+    """Represents a notification sent to a user, such as for new offers, messages, or updates on their listings or service requests."""
     __tablename__ = "notifications"
 
     notification_id = Column(Integer, primary_key=True, index=True)
@@ -258,3 +285,17 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="notifications")
+
+
+class Facility(Base):
+    """Recycling centers, repair shops, and collection points for the map."""
+    __tablename__ = "facilities"
+
+    facility_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    # recycler, repair, collection
+    facility_type = Column(String(50), nullable=False)
+    latitude = Column(Numeric(10, 7), nullable=False)
+    longitude = Column(Numeric(10, 7), nullable=False)
+    materials = Column(String(200))  # Accepted materials (for recyclers)
+    sector = Column(String(80))  # Location sector
