@@ -25,6 +25,15 @@ def get_stats(
     return admin_service.get_admin_stats(db)
 
 
+@router.get("/users", response_model=List[UserOut])
+def get_all_users(
+    current_user: User = Depends(admin_only),
+    db: Session = Depends(get_db),
+):
+    """Get all non-admin users."""
+    return admin_service.get_all_users(db)
+
+
 @router.get("/pending-users", response_model=List[UserOut])
 def get_pending_users(
     current_user: User = Depends(admin_only),
@@ -56,6 +65,15 @@ def reject_user(
     """Reject a user's registration."""
     notes = data.admin_notes if data else None
     return admin_service.reject_user(db, user_id, current_user.user_id, notes)
+
+
+@router.get("/listings", response_model=List[ListingOut])
+def get_all_listings(
+    current_user: User = Depends(admin_only),
+    db: Session = Depends(get_db),
+):
+    """Get all listings for admin management (all statuses)."""
+    return admin_service.get_all_listings(db)
 
 
 @router.get("/pending-listings", response_model=List[ListingOut])

@@ -1,11 +1,12 @@
 """Review and rating endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.schemas.schemas import ReviewCreate, ReviewOut
-from app.models.models import User, Review, InteractionType
+from app.models.models import User, Review, TechnicianProfile, InteractionType
 from app.middleware.auth import get_current_user
 
 router = APIRouter(prefix="/api/reviews", tags=["Reviews"])
@@ -40,6 +41,18 @@ def create_review(
     db.add(review)
     db.commit()
     db.refresh(review)
+
+    # Recalculate TechnicianProfile.average_rating from all reviews
+    profile = db.query(TechnicianProfile).filter(
+        TechnicianProfile.user_id == data.reviewed_user_id
+    ).first()
+    if profile:
+        avg = db.query(func.avg(Review.rating)).filter(
+            Review.reviewed_user_id == data.reviewed_user_id
+        ).scalar()
+        profile.average_rating = round(float(avg), 2) if avg else 0
+        db.commit()
+
     return ReviewOut.model_validate(review)
 
 

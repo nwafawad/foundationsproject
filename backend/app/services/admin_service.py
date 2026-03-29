@@ -3,17 +3,27 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from app.models.models import (
-    User, WasteListing, Transaction, Review, Notification,
+    User, WasteListing, Transaction, Review, Notification, TechnicianProfile,
     UserRole, VerificationStatus, ListingStatus, TransactionStatus,
 )
 from app.schemas.schemas import AdminStatsOut, UserOut, ListingOut
 from app.services.listing_service import match_recyclers
-from typing import List
 
 
-def get_pending_users(db: Session) -> List[UserOut]:
+def get_all_users(db: Session) -> list[UserOut]:
+    """Get all non-admin users."""
+    users = (
+        db.query(User)
+        .filter(User.role != UserRole.admin)
+        .order_by(User.created_at.desc())
+        .all()
+    )
+    return [UserOut.model_validate(u) for u in users]
+
+
+def get_pending_users(db: Session) -> list[UserOut]:
     """Get all users awaiting admin verification."""
     users = (
         db.query(User)
@@ -41,7 +51,19 @@ def verify_user(
     user.verified_at = datetime.utcnow()
     user.admin_notes = admin_notes
 
-    # Notify user
+    if user.role == UserRole.technician:
+        profile = db.query(TechnicianProfile).filter(
+            TechnicianProfile.user_id == user.user_id
+        ).first()
+        if profile:
+            profile.verification_status = VerificationStatus.approved
+        else:
+            # Profile was not created at registration (legacy account) — create it now
+            db.add(TechnicianProfile(
+                user_id=user.user_id,
+                verification_status=VerificationStatus.approved,
+            ))
+
     notif = Notification(
         user_id=user.user_id,
         type="verification_approved",
@@ -77,7 +99,44 @@ def reject_user(
     return UserOut.model_validate(user)
 
 
-def get_pending_listings(db: Session) -> List[ListingOut]:
+def get_all_listings(db: Session) -> list[ListingOut]:
+    """Get all listings for admin view (all statuses)."""
+    results = (
+        db.query(WasteListing, User)
+        .join(User, WasteListing.posted_by == User.user_id)
+        .order_by(WasteListing.created_at.desc())
+        .all()
+    )
+    return [
+        ListingOut(
+            listing_id=listing.listing_id,
+            posted_by=listing.posted_by,
+            poster_name=poster.full_name,
+            seller_name=poster.full_name,
+            material_type=listing.material_type.value,
+            material=listing.material_type.value,
+            quantity_kg=float(listing.quantity_kg),
+            qty=float(listing.quantity_kg),
+            condition=listing.condition.value,
+            title=listing.title,
+            description=listing.description,
+            district=listing.district,
+            sector=listing.sector,
+            status=listing.status.value,
+            price=float(listing.price) if listing.price else 0,
+            date=listing.created_at.strftime("%Y-%m-%d") if listing.created_at else None,
+            views=listing.views or 0,
+            favorites=listing.favorites or 0,
+            image=listing.image,
+            payment_method=listing.payment_method,
+            payment_number=listing.payment_number,
+            created_at=listing.created_at,
+        )
+        for listing, poster in results
+    ]
+
+
+def get_pending_listings(db: Session) -> list[ListingOut]:
     """Get all listings awaiting admin review."""
     results = (
         db.query(WasteListing, User)
@@ -88,18 +147,18 @@ def get_pending_listings(db: Session) -> List[ListingOut]:
     )
     return [
         ListingOut(
-            listing_id=l.listing_id,
-            posted_by=l.posted_by,
-            poster_name=u.full_name,
-            material_type=l.material_type.value,
-            quantity_kg=float(l.quantity_kg),
-            condition=l.condition.value,
-            description=l.description,
-            district=l.district,
-            status=l.status.value,
-            created_at=l.created_at,
+            listing_id=listing.listing_id,
+            posted_by=listing.posted_by,
+            poster_name=poster.full_name,
+            material_type=listing.material_type.value,
+            quantity_kg=float(listing.quantity_kg),
+            condition=listing.condition.value,
+            description=listing.description,
+            district=listing.district,
+            status=listing.status.value,
+            created_at=listing.created_at,
         )
-        for l, u in results
+        for listing, poster in results
     ]
 
 
@@ -122,12 +181,14 @@ def approve_listing(
     notif = Notification(
         user_id=listing.posted_by,
         type="listing_approved",
-        message=f"Your listing #{listing.listing_id} has been approved and is now live on the marketplace.",
+        message=(
+            f"Your listing #{listing.listing_id} has been approved "
+            f"and is now live on the marketplace."
+        ),
     )
     db.add(notif)
     db.commit()
 
-    # Trigger async recycler matching
     match_recyclers(db, listing_id)
 
     db.refresh(listing)
@@ -163,7 +224,10 @@ def reject_listing(
     notif = Notification(
         user_id=listing.posted_by,
         type="listing_rejected",
-        message=f"Your listing #{listing.listing_id} was not approved. Reason: {admin_notes or 'Contact support for details.'}",
+        message=(
+            f"Your listing #{listing.listing_id} was not approved. "
+            f"Reason: {admin_notes or 'Contact support for details.'}"
+        ),
     )
     db.add(notif)
     db.commit()

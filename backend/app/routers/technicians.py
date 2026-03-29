@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.database import get_db
-from app.schemas.schemas import TechnicianProfileOut, ServiceRequestCreate, ServiceRequestOut
+from app.schemas.schemas import TechnicianProfileOut, ServiceRequestCreate, ServiceRequestOut, ServiceRequestStatusUpdate
 from app.services import technician_service
 from app.middleware.auth import get_current_user
 from app.models.models import User
@@ -41,3 +41,16 @@ def get_my_service_requests(
 ):
     """Get all service requests for the current user."""
     return technician_service.get_user_service_requests(db, current_user.user_id)
+
+
+@router.patch("/service-requests/{request_id}/status", response_model=ServiceRequestOut)
+def update_service_request_status(
+    request_id: int,
+    data: ServiceRequestStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Technician updates the status of a service request."""
+    return technician_service.update_service_request_status(
+        db, request_id, current_user.user_id, data.status
+    )
