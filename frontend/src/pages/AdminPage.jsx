@@ -3,17 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LangContext';
 import T from '../data/translations';
 import {
-  getAdminStats, getPendingUsers, getPendingListings, getActiveTransactions,
-  approveUser, rejectUser, approveListing, rejectListing, scheduleVisit,
-  getAllUsers, getListings, getAllOffers,
   suspendUser, deleteUser, removeListing, flagListing, cancelTransaction,
   getReviews, getFeedback, approveReview, deleteReview, markFeedbackRead, deleteFeedback,
   getPublishedTestimonials, addTestimonial, deleteTestimonial,
 } from '../utils/mockService';
+import {
+  adminGetAllUsers, adminApproveUser, adminRejectUser, adminGetStats,
+  adminGetAllListings, adminApproveListing, adminRejectListing,
+} from '../utils/api';
 import { RoleBadge, StatusBadge } from '../components/Badge';
 import Toast from '../components/Toast';
 
-// Small summary card used in the top stats grid — shows a label, big number, and icon
 function StatCard({ label, value, color, bg, icon }) {
   return (
     <div className="admin-stat gc">
@@ -26,12 +26,10 @@ function StatCard({ label, value, color, bg, icon }) {
   );
 }
 
-// Reusable confirmation dialog — shown before any destructive action (delete, suspend, cancel)
 function ConfirmModal({ message, onConfirm, onCancel }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(6px)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: 28, maxWidth: 380, width: '100%', boxShadow: 'var(--shadow-lg)' }}>
-        {/* Warning icon */}
         <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
         </div>
@@ -45,56 +43,52 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
   );
 }
 
-// Full admin dashboard — blocked from non-admin users with an early return guard
 export default function AdminPage({ navigate }) {
   const { user } = useAuth();
   const { lang } = useLang();
   const t = T[lang];
 
-  const [tab, setTab] = useState('accounts'); // active tab key
-
-  // ─── Data fetched from mockService ────────────────────────────────────────
+  const [tab, setTab] = useState('accounts');
   const [stats, setStats] = useState({});
-  const [pendingUsers, setPendingUsers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [allListings, setAllListings] = useState([]);
   const [allOffers, setAllOffers] = useState([]);
-  const [transactions, setTransactions] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
   const [testimonialForm, setTestimonialForm] = useState({ name: '', role: '', text: '', rating: 5 });
-
-  // ─── UI state ──────────────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
-  const [confirm, setConfirm] = useState(null); // { message, onConfirm } — drives the ConfirmModal
+  const [confirm, setConfirm] = useState(null);
 
-  // ─── Filter state (Users tab) ──────────────────────────────────────────────
+  // Filters
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userStatusFilter, setUserStatusFilter] = useState('all');
-
-  // ─── Filter state (Listings tab) ──────────────────────────────────────────
   const [listingSearch, setListingSearch] = useState('');
   const [listingStatusFilter, setListingStatusFilter] = useState('all');
 
-  // Fetches all data from mockService and resets every state slice —
-  // called on mount and after any mutating action to keep the UI in sync
-  const reload = () => {
-    setStats(getAdminStats());
-    setPendingUsers(getPendingUsers());
-    setAllUsers(getAllUsers().filter(u => u.role !== 'admin')); // exclude the admin's own account
-    setAllListings(getListings());
-    setAllOffers(getAllOffers());
-    setTransactions(getActiveTransactions());
+  const reload = async () => {
+    try {
+      const [users, stats] = await Promise.all([adminGetAllUsers(), adminGetStats()]);
+      setAllUsers(users);
+      setStats(stats);
+    } catch {
+      // API unreachable — leave existing state
+    }
+    try {
+      const listings = await adminGetAllListings();
+      setAllListings(listings);
+    } catch {
+      // API unreachable — leave existing state
+    }
+    setAllOffers([]);
     setReviews(getReviews());
     setFeedback(getFeedback());
     setTestimonials(getPublishedTestimonials());
   };
 
-  useEffect(() => { reload(); }, []); // initial load only
+  useEffect(() => { reload(); }, []);
 
-  // Guard: non-admin users see an error screen instead of the dashboard
   if (!user || user.role !== 'admin') {
     return (
       <div className="pg pi" style={{ textAlign: 'center', paddingTop: 60 }}>
@@ -104,15 +98,30 @@ export default function AdminPage({ navigate }) {
     );
   }
 
-  // ─── Action helpers ────────────────────────────────────────────────────────
-  // Shorthand to open the ConfirmModal with a custom message and callback
+  // ── Action helpers ──
   const ask = (message, onConfirm) => setConfirm({ message, onConfirm });
 
-  // User actions
-  const doApproveUser = (id) => { approveUser(id); reload(); setToast({ message: t.success.userApproved, type: 'success' }); };
-  const doRejectUser = (id) => ask(`Reject and delete this user account permanently?`, () => { rejectUser(id); reload(); setConfirm(null); setToast({ message: t.success.userRejected, type: 'info' }); });
+  const doApproveUser = async (id) => {
+    try {
+      await adminApproveUser(id);
+      await reload();
+      setToast({ message: t.success.userApproved, type: 'success' });
+    } catch (err) {
+      setToast({ message: err?.message || 'Approval failed', type: 'error' });
+    }
+  };
+  const doRejectUser = (id) => ask(`Reject this user account permanently?`, async () => {
+    try {
+      await adminRejectUser(id);
+      setConfirm(null);
+      await reload();
+      setToast({ message: t.success.userRejected, type: 'info' });
+    } catch (err) {
+      setConfirm(null);
+      setToast({ message: err?.message || 'Rejection failed', type: 'error' });
+    }
+  });
   const doSuspendUser = (id, name, currently) => {
-    // Label and toast message change based on whether the account is currently suspended
     ask(`${currently ? 'Unsuspend' : 'Suspend'} account for "${name}"?`, () => {
       suspendUser(id); reload(); setConfirm(null);
       setToast({ message: `Account ${currently ? 'unsuspended' : 'suspended'}.`, type: currently ? 'success' : 'info' });
@@ -120,37 +129,50 @@ export default function AdminPage({ navigate }) {
   };
   const doDeleteUser = (id, name) => ask(`Permanently delete account for "${name}" and all their data? This cannot be undone.`, () => { deleteUser(id); reload(); setConfirm(null); setToast({ message: 'User deleted.', type: 'info' }); });
 
-  // Listing actions
-  const doApproveListing = (id) => { approveListing(id); reload(); setToast({ message: t.success.listingApproved, type: 'success' }); };
-  const doRejectListing = (id) => ask('Reject this listing?', () => { rejectListing(id); reload(); setConfirm(null); setToast({ message: t.success.listingRejected, type: 'info' }); });
+  const doApproveListing = async (id) => {
+    try {
+      await adminApproveListing(id);
+      await reload();
+      setToast({ message: t.success.listingApproved, type: 'success' });
+    } catch (err) {
+      setToast({ message: err?.message || 'Approval failed', type: 'error' });
+    }
+  };
+  const doRejectListing = (id) => ask('Reject this listing?', async () => {
+    try {
+      await adminRejectListing(id);
+      setConfirm(null);
+      await reload();
+      setToast({ message: t.success.listingRejected, type: 'info' });
+    } catch (err) {
+      setConfirm(null);
+      setToast({ message: err?.message || 'Rejection failed', type: 'error' });
+    }
+  });
   const doRemoveListing = (id, title) => ask(`Remove listing "${title}" from the platform? All related offers will be cancelled.`, () => { removeListing(id); reload(); setConfirm(null); setToast({ message: 'Listing removed.', type: 'info' }); });
-  // flagListing returns the updated state so we can tailor the toast message
   const doFlagListing = (id, currently) => { const r = flagListing(id); reload(); setToast({ message: r.flagged ? 'Listing flagged for review.' : 'Flag removed.', type: 'info' }); };
   const doCancelTx = (id) => ask('Cancel this transaction? The listing will be returned to available status.', () => { cancelTransaction(id); reload(); setConfirm(null); setToast({ message: 'Transaction cancelled.', type: 'info' }); });
 
-  // Review / feedback / testimonial actions
   const doApproveReview = (id) => { approveReview(id); reload(); setToast({ message: 'Review approved and published as testimonial.', type: 'success' }); };
   const doDeleteReview = (id) => ask('Delete this review permanently?', () => { deleteReview(id); reload(); setConfirm(null); setToast({ message: 'Review deleted.', type: 'info' }); });
-  const doMarkFeedbackRead = (id) => { markFeedbackRead(id); reload(); }; // no toast — clicking the card is the interaction
+  const doMarkFeedbackRead = (id) => { markFeedbackRead(id); reload(); };
   const doDeleteFeedback = (id) => ask('Delete this feedback message?', () => { deleteFeedback(id); reload(); setConfirm(null); setToast({ message: 'Feedback deleted.', type: 'info' }); });
 
   const doAddTestimonial = (e) => {
     e.preventDefault();
-    if (!testimonialForm.name || !testimonialForm.role || !testimonialForm.text) return; // basic guard (HTML required also helps)
+    if (!testimonialForm.name || !testimonialForm.role || !testimonialForm.text) return;
     addTestimonial(testimonialForm);
     reload();
-    setTestimonialForm({ name: '', role: '', text: '', rating: 5 }); // reset form after submit
+    setTestimonialForm({ name: '', role: '', text: '', rating: 5 });
     setToast({ message: 'Testimonial added successfully.', type: 'success' });
   };
   const doDeleteTestimonial = (id) => ask('Remove this testimonial from the homepage?', () => { deleteTestimonial(id); reload(); setConfirm(null); setToast({ message: 'Testimonial removed.', type: 'info' }); });
 
-  // ─── Filtered views ────────────────────────────────────────────────────────
-  // Users: filter by free-text, role, and account status — recalculates only when inputs change
+  // ── Filtered views ──
   const filteredUsers = useMemo(() => allUsers.filter(u => {
     const q = userSearch.toLowerCase();
     const matchSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.sector || '').toLowerCase().includes(q);
     const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-    // Status has three exclusive states: active (verified + not suspended), pending, suspended
     const matchStatus = userStatusFilter === 'all'
       || (userStatusFilter === 'active' && u.verified && !u.suspended)
       || (userStatusFilter === 'pending' && !u.verified)
@@ -158,7 +180,6 @@ export default function AdminPage({ navigate }) {
     return matchSearch && matchRole && matchStatus;
   }), [allUsers, userSearch, userRoleFilter, userStatusFilter]);
 
-  // Listings: filter by free-text and status; "flagged" is a boolean overlay, not a status value
   const filteredListings = useMemo(() => allListings.filter(l => {
     const q = listingSearch.toLowerCase();
     const matchSearch = !q || l.title.toLowerCase().includes(q) || (l.sector || '').toLowerCase().includes(q);
@@ -166,7 +187,6 @@ export default function AdminPage({ navigate }) {
     return matchSearch && matchStatus;
   }), [allListings, listingSearch, listingStatusFilter]);
 
-  // Tab definitions — count badges show pending/actionable items only
   const tabs = [
     { key: 'accounts', label: lang === 'en' ? 'Users' : 'Abakoresheje', count: stats.pendingUsers },
     { key: 'listings', label: lang === 'en' ? 'Listings' : 'Amatangazo', count: stats.pendingListings + (stats.flaggedListings || 0) },
@@ -175,7 +195,6 @@ export default function AdminPage({ navigate }) {
     { key: 'testimonials', label: lang === 'en' ? 'Testimonials' : 'Imivugo', count: 0 },
   ];
 
-  // Returns background, text colour, and label for a user's account status pill
   const userStatusColor = (u) => {
     if (u.suspended) return { bg: '#fee2e2', color: '#dc2626', label: 'Suspended' };
     if (!u.verified) return { bg: '#fef3c7', color: '#d97706', label: 'Pending' };
@@ -185,7 +204,6 @@ export default function AdminPage({ navigate }) {
   return (
     <div className="pg pi">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      {/* ConfirmModal is only mounted when a destructive action is pending */}
       {confirm && <ConfirmModal message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       {/* Header */}
@@ -201,7 +219,7 @@ export default function AdminPage({ navigate }) {
         </p>
       </div>
 
-      {/* Stats grid — split into two rows of four to fit all eight metrics */}
+      {/* Stats - 2 rows */}
       <div className="admin-stats" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 8 }}>
         <StatCard label={lang === 'en' ? 'Total Users' : 'Abakoresheje'} value={stats.totalUsers || 0} color="#7c3aed" bg="#ede9fe"
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>} />
@@ -223,7 +241,7 @@ export default function AdminPage({ navigate }) {
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>} />
       </div>
 
-      {/* Tab bar — red count badges show pending/actionable items */}
+      {/* Tabs */}
       <div className="admin-tabs">
         {tabs.map(tb => (
           <button key={tb.key} className={`at${tab === tb.key ? ' att' : ''}`} onClick={() => setTab(tb.key)}>
@@ -240,7 +258,7 @@ export default function AdminPage({ navigate }) {
       {/* ── TAB: USERS ── */}
       {tab === 'accounts' && (
         <div>
-          {/* Search + role + status filters */}
+          {/* Filters */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             <div className="search-wrap" style={{ flex: 1, minWidth: 200 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
@@ -273,20 +291,17 @@ export default function AdminPage({ navigate }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filteredUsers.map(u => {
                 const statusStyle = userStatusColor(u);
-                // Pending approval only applies to technicians and recyclers — citizens/buyers auto-verify
                 const isPending = !u.verified && ['technician', 'recycler'].includes(u.role);
                 return (
-                  <div key={u.id} className="gc" style={{ padding: '16px 20px',
-                    // Left border colour signals account state at a glance
-                    borderLeft: u.suspended ? '3px solid #dc2626' : u.flagged ? '3px solid #f59e0b' : '3px solid transparent' }}>
+                  <div key={u.id} className="gc" style={{ padding: '16px 20px', borderLeft: u.suspended ? '3px solid #dc2626' : u.flagged ? '3px solid #f59e0b' : '3px solid transparent' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                      {/* Avatar — dimmed when suspended */}
+                      {/* Avatar */}
                       <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,var(--green),var(--blue))', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: u.suspended ? 0.5 : 1 }}>
                         {u.profilePhoto
                           ? <img src={u.profilePhoto} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
                           : (u.avatar || u.name?.[0])}
                       </div>
-                      {/* Name, role badge, status pill, email, sector/spec */}
+                      {/* Info */}
                       <div style={{ flex: 1, minWidth: 160 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 700, fontSize: 14 }}>{u.name}</span>
@@ -295,11 +310,10 @@ export default function AdminPage({ navigate }) {
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{u.email}</div>
                         <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 1 }}>
-                          {/* spec for technicians, company for recyclers */}
                           {u.sector}{u.spec ? ` · ${u.spec}` : ''}{u.company ? ` · ${u.company}` : ''}
                         </div>
                       </div>
-                      {/* Contextual action buttons — pending users get approve/schedule; active users get suspend/delete */}
+                      {/* Actions */}
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {isPending && <>
                           <button className="btn-acc" style={{ fontSize: 11, padding: '6px 12px' }} onClick={() => doApproveUser(u.id)}>
@@ -312,7 +326,6 @@ export default function AdminPage({ navigate }) {
                           </button>
                         </>}
                         {!isPending && (
-                          // Suspend/unsuspend toggle — label, colour, and icon flip based on current state
                           <button
                             onClick={() => doSuspendUser(u.id, u.name, u.suspended)}
                             style={{ fontSize: 11, padding: '6px 12px', background: u.suspended ? 'var(--green-l)' : '#fef3c7', color: u.suspended ? 'var(--green)' : '#b45309', border: `1px solid ${u.suspended ? 'var(--green)' : '#f59e0b'}44`, borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -321,7 +334,6 @@ export default function AdminPage({ navigate }) {
                             {u.suspended ? (lang === 'en' ? 'Unsuspend' : 'Rekura') : (lang === 'en' ? 'Suspend' : 'Hagarika')}
                           </button>
                         )}
-                        {/* Delete is always available and always goes through a confirm dialog */}
                         <button
                           onClick={() => doDeleteUser(u.id, u.name)}
                           style={{ fontSize: 11, padding: '6px 12px', background: '#fee2e2', color: '#dc2626', border: '1px solid #dc262644', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -342,7 +354,7 @@ export default function AdminPage({ navigate }) {
       {/* ── TAB: LISTINGS ── */}
       {tab === 'listings' && (
         <div>
-          {/* Search + status filters */}
+          {/* Filters */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             <div className="search-wrap" style={{ flex: 1, minWidth: 200 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
@@ -369,12 +381,9 @@ export default function AdminPage({ navigate }) {
               {filteredListings.map(l => {
                 const isPending = l.status === 'pending_review';
                 return (
-                  <div key={l.id} className="gc" style={{ padding: '16px 20px',
-                    // Yellow = flagged, blue = awaiting review, transparent = live
-                    borderLeft: l.flagged ? '3px solid #f59e0b' : isPending ? '3px solid #0ea5e9' : '3px solid transparent' }}>
+                  <div key={l.id} className="gc" style={{ padding: '16px 20px', borderLeft: l.flagged ? '3px solid #f59e0b' : isPending ? '3px solid #0ea5e9' : '3px solid transparent' }}>
                     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                      {/* Listing thumbnail — hidden gracefully if the image URL is broken */}
-                      <img src={l.image} alt={l.title} style={{ width: 80, height: 58, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                      <img src={l.image} alt={l.title} style={{ width: 80, height: 58, borderRadius: 10, objectFit: 'contain', background: 'var(--bg)', flexShrink: 0 }}
                         onError={e => { e.target.style.display = 'none'; }} />
                       <div style={{ flex: 1, minWidth: 180 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -382,7 +391,6 @@ export default function AdminPage({ navigate }) {
                           <StatusBadge status={l.status} />
                           {l.flagged && <span style={{ background: '#fef3c7', color: '#b45309', borderRadius: 100, padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>Flagged</span>}
                         </div>
-                        {/* Truncate long descriptions to keep cards compact */}
                         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>{l.description?.slice(0, 90)}{l.description?.length > 90 ? '...' : ''}</div>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 11, color: 'var(--text3)' }}>
                           <span style={{ background: 'var(--bg)', borderRadius: 6, padding: '1px 8px', textTransform: 'capitalize', fontWeight: 600, color: 'var(--text2)' }}>{l.material}</span>
@@ -393,7 +401,6 @@ export default function AdminPage({ navigate }) {
                         </div>
                       </div>
                     </div>
-                    {/* Action row — pending listings get approve/schedule/reject; live listings get flag/remove */}
                     <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                       {isPending && <>
                         <button className="btn-acc" style={{ flex: 1, minWidth: 90, fontSize: 12 }} onClick={() => doApproveListing(l.id)}>
@@ -410,7 +417,6 @@ export default function AdminPage({ navigate }) {
                         </button>
                       </>}
                       {!isPending && <>
-                        {/* Flag toggle — button colour and label flip based on current flagged state */}
                         <button
                           onClick={() => doFlagListing(l.id, l.flagged)}
                           style={{ fontSize: 12, padding: '7px 14px', background: l.flagged ? '#fef3c7' : 'var(--bg2)', color: l.flagged ? '#b45309' : 'var(--text2)', border: `1px solid ${l.flagged ? '#f59e0b' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}
@@ -438,10 +444,9 @@ export default function AdminPage({ navigate }) {
       {/* ── TAB: REVIEWS & FEEDBACK ── */}
       {tab === 'reviews' && (
         <div>
-          {/* Section 1: User-submitted reviews — pending ones can be promoted to testimonials */}
+          {/* Pending Reviews */}
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
             {lang === 'en' ? 'User Reviews' : 'Ibitekerezo by\'Abakoresheje'}
-            {/* Pending count badge — only shown when there are reviews awaiting moderation */}
             {reviews.filter(r => r.status === 'pending').length > 0 && (
               <span style={{ marginLeft: 8, background: '#fef3c7', color: '#b45309', borderRadius: 100, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 {reviews.filter(r => r.status === 'pending').length} pending
@@ -455,14 +460,12 @@ export default function AdminPage({ navigate }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
               {reviews.map(r => (
-                // Left border colour: yellow = pending, green = approved, grey = other
                 <div key={r.id} className="gc" style={{ padding: '16px 20px', borderLeft: r.status === 'pending' ? '3px solid #f59e0b' : r.status === 'approved' ? '3px solid #16a34a' : '3px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 180 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{r.userName}</span>
                         <span style={{ background: r.status === 'pending' ? '#fef3c7' : '#dcfce7', color: r.status === 'pending' ? '#b45309' : '#16a34a', borderRadius: 100, padding: '1px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{r.status}</span>
-                        {/* Star rating rendered as emoji spans */}
                         <span style={{ display: 'flex', gap: 2 }}>
                           {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= r.rating ? '#f59e0b' : 'var(--border)', fontSize: 13 }}>★</span>)}
                         </span>
@@ -473,7 +476,6 @@ export default function AdminPage({ navigate }) {
                       <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, fontStyle: 'italic' }}>"{r.message}"</p>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      {/* Approve button only shown for reviews still awaiting moderation */}
                       {r.status === 'pending' && (
                         <button className="btn-acc" style={{ fontSize: 11, padding: '6px 12px' }} onClick={() => doApproveReview(r.id)}>
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
@@ -490,10 +492,9 @@ export default function AdminPage({ navigate }) {
             </div>
           )}
 
-          {/* Section 2: Free-form platform feedback messages */}
+          {/* Feedback Messages */}
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
             {lang === 'en' ? 'Platform Feedback' : 'Ibitekerezo bya Platform'}
-            {/* Unread count badge */}
             {feedback.filter(f => !f.read).length > 0 && (
               <span style={{ marginLeft: 8, background: '#e0f2fe', color: '#0369a1', borderRadius: 100, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 {feedback.filter(f => !f.read).length} unread
@@ -507,7 +508,6 @@ export default function AdminPage({ navigate }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {feedback.map(f => (
-                // Clicking the card marks it as read; blue border signals unread
                 <div key={f.id} className="gc" style={{ padding: '16px 20px', borderLeft: !f.read ? '3px solid #0ea5e9' : '3px solid transparent', cursor: 'pointer' }}
                   onClick={() => !f.read && doMarkFeedbackRead(f.id)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -515,13 +515,11 @@ export default function AdminPage({ navigate }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{f.userName}</span>
                         <span style={{ background: 'var(--bg)', borderRadius: 6, padding: '1px 8px', fontSize: 10, fontWeight: 600, color: 'var(--text2)', textTransform: 'capitalize' }}>{f.category}</span>
-                        {/* Blue dot indicator for unread messages */}
                         {!f.read && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0ea5e9', display: 'inline-block' }} />}
                       </div>
                       <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>{f.message}</p>
                       <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{f.date}</div>
                     </div>
-                    {/* stopPropagation prevents the card's onClick (mark-read) from also firing */}
                     <button onClick={e => { e.stopPropagation(); doDeleteFeedback(f.id); }} style={{ fontSize: 11, padding: '5px 10px', background: '#fee2e2', color: '#dc2626', border: '1px solid #dc262644', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, flexShrink: 0 }}>
                       {lang === 'en' ? 'Delete' : 'Siba'}
                     </button>
@@ -536,7 +534,7 @@ export default function AdminPage({ navigate }) {
       {/* ── TAB: TESTIMONIALS ── */}
       {tab === 'testimonials' && (
         <div>
-          {/* Form to manually add a testimonial (separate from the review approval flow) */}
+          {/* Add Testimonial Form */}
           <div className="gc" style={{ padding: '20px 24px', marginBottom: 24 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>
               {lang === 'en' ? 'Add New Testimonial' : 'Ongeraho Imivugo Mishya'}
@@ -559,7 +557,6 @@ export default function AdminPage({ navigate }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>{lang === 'en' ? 'Rating' : 'Amanota'}</label>
-                  {/* Interactive star picker — type="button" prevents accidental form submission */}
                   <div style={{ display: 'flex', gap: 4 }}>
                     {[1,2,3,4,5].map(s => (
                       <button key={s} type="button" onClick={() => setTestimonialForm(f => ({ ...f, rating: s }))}
@@ -575,7 +572,7 @@ export default function AdminPage({ navigate }) {
             </form>
           </div>
 
-          {/* Grid of currently published testimonials */}
+          {/* Current Testimonials */}
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
             {lang === 'en' ? `Published Testimonials (${testimonials.length})` : `Imivugo Yashyizwe Ahagaragara (${testimonials.length})`}
           </h3>
@@ -586,10 +583,8 @@ export default function AdminPage({ navigate }) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
               {testimonials.map(t2 => (
-                // t2 used to avoid shadowing the outer `t` translation object
                 <div key={t2.id} className="gc" style={{ padding: '16px 18px', position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    {/* Avatar generated from initials (max 2 letters) */}
                     <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,var(--green),var(--blue))', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {t2.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
@@ -603,7 +598,6 @@ export default function AdminPage({ navigate }) {
                   </div>
                   <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, fontStyle: 'italic', marginBottom: 12 }}>"{t2.text}"</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {/* Source badge distinguishes reviews promoted by admin vs ones added manually */}
                     <span style={{ fontSize: 10, background: t2.source === 'review' ? '#e0f2fe' : '#dcfce7', color: t2.source === 'review' ? '#0369a1' : '#16a34a', borderRadius: 6, padding: '2px 7px', fontWeight: 600, textTransform: 'uppercase' }}>
                       {t2.source === 'review' ? 'From Review' : 'Admin Added'}
                     </span>
@@ -621,7 +615,6 @@ export default function AdminPage({ navigate }) {
       {/* ── TAB: TRANSACTIONS ── */}
       {tab === 'transactions' && (
         <div>
-          {/* Show only offers that are accepted or countered — these are the "live" transactions */}
           {allOffers.filter(o => ['accepted', 'countered'].includes(o.status)).length === 0 ? (
             <div className="gc" style={{ padding: 40, textAlign: 'center', color: 'var(--text2)' }}>
               {t.admin.noTransactions}
@@ -629,12 +622,9 @@ export default function AdminPage({ navigate }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {allOffers.filter(o => ['accepted', 'countered'].includes(o.status)).map(o => {
-                // Join offer to its listing for the title and sellerId
                 const listing = allListings.find(l => l.id === o.listingId);
                 return (
-                  <div key={o.id} className="gc" style={{ padding: '16px 20px',
-                    // Red = cancelled by admin, green = completed, blue = in progress
-                    borderLeft: o.cancelledByAdmin ? '3px solid #dc2626' : o.txStatus === 'completed' ? '3px solid #16a34a' : '3px solid #0ea5e9' }}>
+                  <div key={o.id} className="gc" style={{ padding: '16px 20px', borderLeft: o.cancelledByAdmin ? '3px solid #dc2626' : o.txStatus === 'completed' ? '3px solid #16a34a' : '3px solid #0ea5e9' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ flex: 1, minWidth: 180 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -650,7 +640,6 @@ export default function AdminPage({ navigate }) {
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--green)' }}>{(o.amount || 0).toLocaleString()} RWF</div>
-                        {/* Cancel button hidden for completed or already-cancelled transactions */}
                         {o.txStatus !== 'completed' && !o.cancelledByAdmin && (
                           <button
                             onClick={() => doCancelTx(o.id)}
