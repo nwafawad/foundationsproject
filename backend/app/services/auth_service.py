@@ -1,9 +1,8 @@
 """Authentication service — registration, login, token refresh."""
 
-from datetime import datetime
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from app.models.models import User, Notification, UserRole, VerificationStatus
+from app.models.models import User, Notification, TechnicianProfile, UserRole, VerificationStatus
 from app.schemas.schemas import UserRegister, UserLogin, TokenResponse, UserOut
 from app.middleware.auth import (
     hash_password, verify_password,
@@ -38,14 +37,23 @@ def register_user(db: Session, data: UserRegister) -> UserOut:
     db.add(user)
     db.flush()
 
-    # Notify admins if verification required
+    if data.role == "technician":
+        profile = TechnicianProfile(
+            user_id=user.user_id,
+            verification_status=VerificationStatus.pending,
+        )
+        db.add(profile)
+
     if not auto_verify:
         admins = db.query(User).filter(User.role == UserRole.admin).all()
         for admin in admins:
             notif = Notification(
                 user_id=admin.user_id,
                 type="new_registration",
-                message=f"New {data.role} registration: {data.full_name} ({data.email}) — requires verification.",
+                message=(
+                    f"New {data.role} registration: "
+                    f"{data.full_name} ({data.email}) — requires verification."
+                ),
             )
             db.add(notif)
 
