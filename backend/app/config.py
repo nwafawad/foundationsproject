@@ -6,7 +6,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database — uses psycopg3. Set to sqlite for local dev without PostgreSQL
-    DATABASE_URL: str = "sqlite:///./recyx_dev.db"
+    DATABASE_URL: str = "sqlite:///./recyx.db"
 
     # JWT
     SECRET_KEY: str = "dev-secret-key-change-in-production"

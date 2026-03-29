@@ -18,7 +18,6 @@ from app.database import Base
 # ── Enums ──
 
 class UserRole(str, enum.Enum):
-    """Defines the different roles a user can have on the platform, which determines their permissions and access to features."""
     citizen = "citizen"
     technician = "technician"
     recycler = "recycler"
@@ -27,7 +26,6 @@ class UserRole(str, enum.Enum):
 
 
 class VerificationStatus(str, enum.Enum):
-    """Represents the verification status of a user or listing, which can be pending, approved, or rejected based on admin review."""
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
@@ -50,7 +48,6 @@ class WasteCondition(str, enum.Enum):
 
 
 class ListingStatus(str, enum.Enum):
-    """Represents the status of a waste listing in the marketplace, which can be pending review, available for offers, matched with a buyer, in transaction, completed, or rejected by admin."""
     pending_review = "pending_review"
     available = "available"
     matched = "matched"
@@ -60,7 +57,6 @@ class ListingStatus(str, enum.Enum):
 
 
 class TransactionStatus(str, enum.Enum):
-    """Represents the status of a transaction in the marketplace, which can be offer received, offer accepted, in transit, completed, or cancelled."""
     offer_received = "offer_received"
     offer_accepted = "offer_accepted"
     in_transit = "in_transit"
@@ -69,7 +65,6 @@ class TransactionStatus(str, enum.Enum):
 
 
 class ServiceRequestStatus(str, enum.Enum):
-    """Represents the status of a service request in the platform, which can be pending, confirmed, in progress, completed, or cancelled."""
     pending = "pending"
     confirmed = "confirmed"
     in_progress = "in_progress"
@@ -78,7 +73,6 @@ class ServiceRequestStatus(str, enum.Enum):
 
 
 class InteractionType(str, enum.Enum):
-    """Represents the type of interaction for reviews, which can be a repair service or a waste transaction."""
     repair = "repair"
     waste_transaction = "waste_transaction"
 
@@ -86,7 +80,6 @@ class InteractionType(str, enum.Enum):
 # ── Models ──
 
 class User(Base):
-    """All users of the platform, including citizens, technicians, recyclers, buyers, and admins."""
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, index=True)
@@ -124,7 +117,6 @@ class User(Base):
 
 
 class TechnicianProfile(Base):
-    """Additional details for users with the technician role, including their specialisation, experience, and verification status."""
     __tablename__ = "technician_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -146,7 +138,6 @@ class TechnicianProfile(Base):
 
 
 class RecyclerProfile(Base):
-    """Additional details for users with the recycler role, including their company information and operating details."""
     __tablename__ = "recycler_profiles"
 
     profile_id = Column(Integer, primary_key=True, index=True)
@@ -165,7 +156,6 @@ class RecyclerProfile(Base):
 
 
 class WasteListing(Base):
-    """Listings for waste materials that citizens want to sell or give away, including details about the material, condition, location, and transaction status."""
     __tablename__ = "waste_listings"
 
     listing_id = Column(Integer, primary_key=True, index=True)
@@ -198,14 +188,12 @@ class WasteListing(Base):
 
 
 class Transaction(Base):
-    """Represents a transaction between a buyer and seller for a waste listing, including the agreed price, status, and timestamps for the transaction process."""
     __tablename__ = "transactions"
 
     transaction_id = Column(Integer, primary_key=True, index=True)
     listing_id = Column(
         Integer, ForeignKey("waste_listings.listing_id"), nullable=False
     )
-    # seller_id and buyer_id reference users, but we don't set up foreign keys here to avoid circular dependencies and allow for flexibility in user roles   
     seller_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     buyer_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     agreed_price = Column(Numeric(10, 2), nullable=True)
@@ -219,7 +207,6 @@ class Transaction(Base):
 
 
 class ServiceRequest(Base):
-    """Represents a service request from a citizen to a technician for device repair, including details about the device, issue, and status of the request."""
     __tablename__ = "service_requests"
 
     request_id = Column(Integer, primary_key=True, index=True)
@@ -241,7 +228,6 @@ class ServiceRequest(Base):
 
 
 class Review(Base):
-    """Represents a review left by a user for another user after an interaction, such as a repair service or waste transaction, including the rating, comment, and type of interaction."""
     __tablename__ = "reviews"
 
     review_id = Column(Integer, primary_key=True, index=True)
@@ -270,7 +256,6 @@ class Review(Base):
 
 
 class Favorite(Base):
-    """Represents a favorite listing added by a user."""
     __tablename__ = "favorites"
     __table_args__ = (UniqueConstraint('user_id', 'listing_id', name='unique_user_listing_favorite'),)
 
@@ -281,9 +266,8 @@ class Favorite(Base):
 
 
 class Notification(Base):
-    """Represents a notification sent to a user, such as for new offers, messages, or updates on their listings or service requests."""
     __tablename__ = "notifications"
-    
+
     notification_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     type = Column(String(50))
