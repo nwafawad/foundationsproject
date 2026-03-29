@@ -310,7 +310,7 @@ class OfferOut(BaseModel):
 # ── Reviews/Testimonials ──
 
 class ReviewOutExtended(BaseModel):
-    id: Optional[int] = None 
+    id: Optional[int] = None # Unique identifier for the review, which may be None when creating a new review before it is saved to the database
     review_id: Optional[int] = None
     user_id: Optional[int] = None
     user_name: Optional[str] = None
