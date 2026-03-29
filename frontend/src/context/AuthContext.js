@@ -1,50 +1,53 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authService } from '../utils/mockService';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { logout as apiLogout } from '../utils/api';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUserState] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, restore logged-in user from localStorage
+  // Load persisted user from localStorage on mount
   useEffect(() => {
-    const savedUser = authService.getCurrentUser();
-    if (savedUser) {
-      setUser(savedUser);
+    try {
+      const stored = localStorage.getItem('recyx_current_user');
+      if (stored) {
+        setUserState(JSON.parse(stored));
+      }
+    } catch (e) {
+      localStorage.removeItem('recyx_current_user');
     }
     setLoading(false);
   }, []);
 
-  const login = useCallback((email, password) => {
-    const loggedInUser = authService.login(email, password);
-    setUser(loggedInUser);
-    return loggedInUser;
-  }, []);
+  const setUser = (u) => {
+    setUserState(u);
+    if (u) {
+      localStorage.setItem('recyx_current_user', JSON.stringify(u));
+    } else {
+      localStorage.removeItem('recyx_current_user');
+    }
+  };
 
-  const register = useCallback((data) => {
-    const newUser = authService.register(data);
-    return newUser;
-  }, []);
-
-  const logout = useCallback(() => {
-    authService.logout();
+  const logout = () => {
+    // Call API logout if it exists
+    try {
+      apiLogout();
+    } catch (e) {
+      // Ignore errors
+    }
+    setUserState(null);
     localStorage.removeItem('recyx_current_user');
-    setUser(null);
-  }, []);
-
-  const updateProfile = useCallback((updates) => {
-    if (!user) return;
-    const updated = authService.updateProfile(user.user_id, updates);
-    setUser(updated);
-  }, [user]);
+    localStorage.removeItem('recyx_access_token');
+  };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, updateProfile, loading }}>
+    <AuthContext.Provider value={{ user, setUser, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
-export default AuthContext;
+export function useAuth() {
+  return useContext(AuthContext);
+}
