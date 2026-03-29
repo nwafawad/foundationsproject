@@ -71,7 +71,7 @@ class TechnicianProfileOut(BaseModel):
 
 
 class TechnicianSearchParams(BaseModel):
-    device_type: Optional[str] = None
+    device_type: Optional[str] = None # Specific device type for filtering technicians based on their specialization
     district: Optional[str] = None
     page: int = 1
     limit: int = 20
@@ -109,7 +109,7 @@ class ServiceRequestStatusUpdate(BaseModel):
 class ListingCreate(BaseModel):
     title: str
     material_type: str
-    quantity_kg: float = Field(..., gt=0)
+    quantity_kg: float = Field(..., gt=0) # Ensure quantity is a positive number
     condition: str
     description: Optional[str] = None
     district: str
@@ -176,7 +176,7 @@ class TransactionOut(BaseModel):
     seller_id: int
     buyer_id: int
     buyer_name: Optional[str] = None
-    agreed_price: Optional[float] = None
+    agreed_price: Optional[float] = None # Price agreed upon after negotiation, which may differ from the initial offer
     status: str
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -191,7 +191,7 @@ class ReviewCreate(BaseModel):
     reviewed_user_id: int
     interaction_type: str
     interaction_id: int
-    rating: int = Field(..., ge=1, le=5)
+    rating: int = Field(..., ge=1, le=5) # Ensure rating is between 1 and 5
     comment: Optional[str] = None
 
 
@@ -255,8 +255,8 @@ class FacilityOut(BaseModel):
     type: str
     lat: float
     lng: float
-    materials: Optional[str] = None
-    sector: Optional[str] = None
+    materials: Optional[str] = None # Types of materials accepted or processed at the facility
+    sector: Optional[str] = None # Specific area within the district where the facility is located
 
     class Config:
         from_attributes = True
@@ -265,6 +265,7 @@ class FacilityOut(BaseModel):
 # ── Service Requests (Extended for frontend) ──
 
 class ServiceRequestExtendedOut(BaseModel):
+    """Represents a service request with additional details for frontend display."""
     request_id: int
     citizen_id: int
     technician_id: int
@@ -309,7 +310,7 @@ class OfferOut(BaseModel):
 # ── Reviews/Testimonials ──
 
 class ReviewOutExtended(BaseModel):
-    id: Optional[int] = None
+    id: Optional[int] = None 
     review_id: Optional[int] = None
     user_id: Optional[int] = None
     user_name: Optional[str] = None
