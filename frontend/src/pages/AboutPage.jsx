@@ -2,7 +2,6 @@ import React from 'react';
 import { useLang } from '../context/LangContext';
 import T from '../data/translations';
 
-// Static team members list — avatar initials and accent color are unique per person
 const TEAM = [
   { name: "Keira Mutoni", role: "Project Manager", avatar: "KM", color: "#16a34a" },
   { name: "Nawaf Ahmed", role: "Backend Developer", avatar: "NA", color: "#0ea5e9" },
@@ -12,7 +11,6 @@ const TEAM = [
   { name: "Cindy Teta", role: "Research & Impact", avatar: "CT", color: "#0ea5e9" },
 ];
 
-// UN Sustainable Development Goals that RECYX directly contributes to
 const SDGs = [
   { num: 9, title: "Industry, Innovation & Infrastructure", color: "#fd6925" },
   { num: 11, title: "Sustainable Cities & Communities", color: "#fd9d24" },
@@ -20,15 +18,13 @@ const SDGs = [
   { num: 13, title: "Climate Action", color: "#3f7e44" },
 ];
 
-// Static informational page — no data fetching or state needed
 export default function AboutPage({ navigate }) {
   const { lang } = useLang();
   const t = T[lang];
 
   return (
     <div className="pg pi">
-
-      {/* ── Hero ── gradient banner with the RECYX logo, headline, and tagline */}
+      {/* Hero */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(22,163,74,.08), rgba(14,165,233,.06))',
         borderRadius: 24, padding: '48px 40px', marginBottom: 40, textAlign: 'center',
@@ -42,10 +38,8 @@ export default function AboutPage({ navigate }) {
             <path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 12.02 3a1.784 1.784 0 0 1 1.572.89l3.468 6.004" />
             <path d="m18.186 12.7 1.096 4.096 4.096-1.098" />
           </svg>
-          {/* Gradient text via background-clip trick */}
           <span style={{ fontSize: 28, fontWeight: 900, background: 'linear-gradient(135deg,var(--green),var(--blue))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>RECYX</span>
         </div>
-        {/* clamp() keeps the heading readable on both mobile and desktop */}
         <h1 style={{ fontSize: 'clamp(22px,4vw,38px)', fontWeight: 900, letterSpacing: '-1.5px', marginBottom: 12 }}>
           {lang === 'en' ? 'Transforming Rwanda\'s Circular Economy' : 'Guhindura Ubukungu bw\'Imyanda mu Rwanda'}
         </h1>
@@ -56,7 +50,7 @@ export default function AboutPage({ navigate }) {
         </p>
       </div>
 
-      {/* ── Mission & Vision ── side-by-side cards */}
+      {/* Mission & Vision */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 40 }}>
         <div className="gc content-section">
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#dcfce7', color: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
@@ -86,7 +80,7 @@ export default function AboutPage({ navigate }) {
         </div>
       </div>
 
-      {/* ── Our Story ── narrative text on the left, impact stat cards on the right */}
+      {/* Our Story */}
       <div className="gc content-section" style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>
           {lang === 'en' ? 'Our Story' : 'Inkuru Yacu'}
@@ -104,7 +98,6 @@ export default function AboutPage({ navigate }) {
                 : 'Twabonye ko miliyoni z\'ibiro by\'ibikoresho bisubirwaho by\'agaciro bari bakuyemo, naho ibihumbi by\'abatuye batahari serivisi zo gusana zigura kandi zizwi. RECYX irahuza icyo gapfa.'}
             </p>
           </div>
-          {/* Impact stat cards — three key metrics shown as coloured highlight boxes */}
           <div>
             <div className="al-s" style={{ borderRadius: 14, padding: 20, marginBottom: 14 }}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>10,000+</div>
@@ -122,7 +115,7 @@ export default function AboutPage({ navigate }) {
         </div>
       </div>
 
-      {/* ── Team ── avatar grid, one card per member */}
+      {/* Team */}
       <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
           {lang === 'en' ? 'Meet Team 7' : 'Menya Itsinda 7'}
@@ -133,7 +126,6 @@ export default function AboutPage({ navigate }) {
         <div className="team-grid">
           {TEAM.map((m, i) => (
             <div key={i} className="team-member gc" style={{ textAlign: 'center', padding: '24px 18px' }}>
-              {/* Avatar circle — background and text colour derived from the member's personal accent color */}
               <div style={{
                 width: 60, height: 60, borderRadius: '50%', margin: '0 auto 14px',
                 background: `linear-gradient(135deg, ${m.color}22, ${m.color}55)`, color: m.color,
@@ -149,7 +141,7 @@ export default function AboutPage({ navigate }) {
         </div>
       </div>
 
-      {/* ── SDG Alignment ── pill row showing the four UN goals RECYX contributes to */}
+      {/* SDG Alignment */}
       <div className="gc content-section" style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
           {lang === 'en' ? 'Aligned with the UN SDGs' : 'Ijyanye n\'Intego z\'UNDP'}
@@ -159,7 +151,6 @@ export default function AboutPage({ navigate }) {
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {SDGs.map(s => (
-            // Each pill uses the SDG's official color for its number badge, border, and text
             <div key={s.num} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
               background: `${s.color}15`, borderRadius: 12, border: `1px solid ${s.color}33`,
@@ -173,7 +164,7 @@ export default function AboutPage({ navigate }) {
         </div>
       </div>
 
-      {/* ── Partners ── logo grid with a text fallback if the image fails to load */}
+      {/* Partners */}
       <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
           {lang === 'en' ? 'Our Partners & Supporters' : 'Inshuti z\'Imirimo Yacu'}
@@ -182,8 +173,6 @@ export default function AboutPage({ navigate }) {
           {lang === 'en' ? 'Proudly supported by Rwanda\'s leading institutions.' : 'Twashyigiwe n\'imiryango ikomeye y\'u Rwanda.'}
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-
-          {/* Each partner card: logo image with a hidden text fallback shown via onError */}
 
           {/* ALU */}
           <div className="gc" style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
@@ -272,7 +261,7 @@ export default function AboutPage({ navigate }) {
         </div>
       </div>
 
-      {/* ── CTA ── gradient footer banner with register and contact actions */}
+      {/* CTA */}
       <div style={{ textAlign: 'center', padding: '32px 24px', background: 'linear-gradient(135deg,rgba(22,163,74,.08),rgba(14,165,233,.06))', borderRadius: 20 }}>
         <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
           {lang === 'en' ? 'Ready to Join RECYX?' : 'Witeguye kwinjira muri RECYX?'}

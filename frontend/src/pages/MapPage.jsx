@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLang } from '../context/LangContext';
 import T from '../data/translations';
 import { MAP_FACILITIES } from '../data/demoData';
+import { getFacilities } from '../utils/api';
 
 // Known sector coordinates across Rwanda for proximity search
 const SECTOR_COORDS = {
@@ -162,7 +163,7 @@ export default function MapPage() {
 
     return () => {
       if (mapInstanceRef.current) {
-        try { mapInstanceRef.current.remove(); } catch (e) {}
+        try { mapInstanceRef.current.remove(); } catch (e) { }
         mapInstanceRef.current = null;
       }
     };
@@ -175,7 +176,7 @@ export default function MapPage() {
     let L;
     try { L = require('leaflet'); } catch (e) { return; }
 
-    markersRef.current.forEach(m => { try { m.remove(); } catch (e) {} });
+    markersRef.current.forEach(m => { try { m.remove(); } catch (e) { } });
     markersRef.current = [];
 
     filtered.forEach(facility => {
@@ -348,7 +349,7 @@ export default function MapPage() {
             )}
             {f.distKm !== undefined && (
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                 {f.distKm < 1 ? `${Math.round(f.distKm * 1000)}m` : `${f.distKm.toFixed(1)} km`} {lang === 'en' ? 'away' : 'urutonde'}
               </div>
             )}
