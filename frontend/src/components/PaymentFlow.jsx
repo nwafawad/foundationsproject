@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
-import { markOfferPaid, confirmReceiptOffer } from '../utils/mockService';
+import { updateTransactionStatus } from '../utils/api';
 
-// Handles the full payment flow between buyer and seller using mobile money (MTN / Airtel)
-// Renders a different UI depending on the user's role (isSeller) and the current txStatus
+async function markOfferPaid(offerId) {
+  return updateTransactionStatus(offerId, 'in_transit');
+}
+async function confirmReceiptOffer(offerId) {
+  return updateTransactionStatus(offerId, 'completed');
+}
+
 export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
-  const [method, setMethod] = useState(offer.payMethod || '');       // selected mobile money provider
-  const [number, setNumber] = useState(offer.payNumber || '');       // mobile number to receive payment
-  const [saved, setSaved] = useState(!!(offer.payMethod && offer.payNumber)); // true if seller has already set payment details
-  const [processing, setProcessing] = useState(false);               // prevents double-clicks during async actions
+  const [method, setMethod] = useState(offer.payMethod || '');
+  const [number, setNumber] = useState(offer.payNumber || '');
+  const [saved, setSaved] = useState(!!(offer.payMethod && offer.payNumber));
+  const [processing, setProcessing] = useState(false);
 
-  // Fall back to 'awaiting_payment' if txStatus hasn't been set yet
   const txStatus = offer.txStatus || 'awaiting_payment';
 
-  // ─── SELLER: Step 1 — choose a payment method and enter their mobile number ───
+  // Seller: set payment details
   if (isSeller && !saved) {
     return (
       <div className="gc" style={{ padding: 20, marginTop: 14 }}>
@@ -20,8 +24,6 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
         <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
           Choose how you want to receive <strong>{(offer.amount || offer.counterAmount || 0).toLocaleString()} RWF</strong>
         </p>
-
-        {/* MTN / Airtel toggle cards — border and background change to match the selected provider */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           {['mtn', 'airtel'].map(m => (
             <div key={m} onClick={() => setMethod(m)} style={{
@@ -37,8 +39,6 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
             </div>
           ))}
         </div>
-
-        {/* Number input only appears once a provider is selected */}
         {method && (
           <>
             <div className="fg">
@@ -54,8 +54,7 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
               className="btn-p"
               style={{ width: '100%', marginTop: 4 }}
               onClick={() => {
-                if (!number.trim()) return; // ignore empty submissions
-                // Persist payment details directly onto the offer object and mark as saved
+                if (!number.trim()) return;
                 offer.payMethod = method;
                 offer.payNumber = number;
                 offer.paymentSet = true;
@@ -71,7 +70,7 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // ─── SELLER: Step 2 — payment details saved, waiting for buyer to send money ───
+  // Seller: awaiting payment
   if (isSeller && saved && txStatus === 'awaiting_payment') {
     return (
       <div className="al-i" style={{ padding: 16, marginTop: 14, borderRadius: 12 }}>
@@ -88,7 +87,7 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // ─── SELLER: Step 3 — buyer has marked payment as sent, seller must confirm receipt ───
+  // Seller: confirm receipt
   if (isSeller && txStatus === 'awaiting_confirmation') {
     return (
       <div className="gc" style={{ padding: 20, marginTop: 14 }}>
@@ -98,7 +97,6 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
         <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
           Confirm you have received <strong>{(offer.amount || 0).toLocaleString()} RWF</strong> via {offer.payMethod === 'mtn' ? 'MTN MoMo' : 'Airtel Money'}.
         </p>
-        {/* Simulated async confirmation — 1s delay mimics a real API call */}
         <button
           className="btn-acc"
           style={{ width: '100%' }}
@@ -118,7 +116,7 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // ─── BOTH ROLES: Transaction is fully complete ───
+  // Completed
   if (txStatus === 'completed') {
     return (
       <div className="al-s" style={{ padding: 16, marginTop: 14, borderRadius: 12 }}>
@@ -130,11 +128,10 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // ─── BUYER: Seller's payment details are ready — show number and "mark as paid" button ───
+  // Buyer: see seller payment details & mark paid
   if (!isSeller && saved) {
     return (
       <div style={{
-        // Card color matches the seller's chosen provider (yellow for MTN, red for Airtel)
         background: offer.payMethod === 'mtn' ? '#FFFDE7' : '#FFF5F5',
         border: `1px solid ${offer.payMethod === 'mtn' ? '#FFCC00' : '#ED1C24'}`,
         borderRadius: 16, padding: 20, marginTop: 14,
@@ -145,8 +142,6 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
         <p style={{ fontSize: 12, marginBottom: 10 }}>
           Send <strong style={{ fontSize: 17 }}>{(offer.amount || 0).toLocaleString()} RWF</strong> to:
         </p>
-
-        {/* Prominently displayed phone number for the buyer to send money to */}
         <div style={{
           background: 'var(--bg2)', borderRadius: 10, padding: '14px 20px',
           marginBottom: 12, fontSize: 20, fontWeight: 800, textAlign: 'center',
@@ -154,19 +149,14 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
         }}>
           {offer.payNumber}
         </div>
-
-        {/* Listing ID used as payment reference so the seller can match the transaction */}
         <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 14 }}>
           Use Listing #{listing?.id || offer.listingId} as your payment reference.
         </p>
-
-        {/* Once the buyer clicks "sent", swap the button for a waiting message */}
         {txStatus === 'awaiting_confirmation' ? (
           <div className="al-s" style={{ borderRadius: 10, padding: 12 }}>
             Payment marked as sent. Waiting for seller confirmation...
           </div>
         ) : (
-          // Simulated async action — 1s delay mimics a real API call
           <button
             className="btn-p"
             style={{ width: '100%' }}
@@ -187,7 +177,7 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // ─── BUYER: Waiting for seller to set up their payment details first ───
+  // Buyer: waiting for seller to set payment method
   if (!isSeller && !saved) {
     return (
       <div className="al-i" style={{ padding: 14, marginTop: 14, borderRadius: 12 }}>
@@ -199,6 +189,5 @@ export default function PaymentFlow({ offer, listing, isSeller, onUpdate }) {
     );
   }
 
-  // Fallback — no matching state, render nothing
   return null;
 }
